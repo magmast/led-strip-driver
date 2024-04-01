@@ -1,46 +1,48 @@
-# Matrix Driver Bluetooth Protocol Specification
+# LED Strip Bluetooth Protocol Specification
 
 ## Overview
 
-This document specifies the Bluetooth protocol for controlling an LED matrix. It defines the structure and behavior of the LED Matrix Service, including characteristics for managing the LED chain length, selecting individual or groups of LEDs, and setting their colors.
+This document outlines the Bluetooth protocol for managing an LED strip, specifying the structure and functionality of the LED Strip Service. It includes characteristics for determining the LED strip length, selecting starting points for LED operations, and configuring their colors. This protocol ensures a unified approach to controlling LED strips across various client and server implementations by adhering to consistent data interpretation standards.
 
-**All numerical data communicated within this protocol, including values read from and written to characteristics, adhere to the little-endian byte order.** This convention applies to multi-byte numbers, ensuring consistent data interpretation across different client and server implementations.
+**All numerical data within this protocol, including values exchanged through characteristics, follows the little-endian byte order.** This standardization applies to multi-byte numerical values, facilitating compatibility across different platforms.
 
-## LED Matrix Service
+## LED Strip Service
 
 - **UUID:** 4fd3af2a-10e8-474f-84d7-722bcfd3efc3
 
-This service provides control over an LED matrix via Bluetooth, allowing for manipulation of individual or all LEDs in a matrix by setting their colors. It comprises the following characteristics:
+The service enables Bluetooth-based manipulation of an LED strip, allowing colors of individual LEDs or groups of LEDs to be set. The service is structured with the following characteristics:
 
 ### Chain Length Characteristic
 
 - **UUID:** 410f7f12-e051-4b5d-a8ed-7d5619727b34
 - **Data type:** `uint16`
 - **Access:** Read only
-- **Description:** Represents the total number of LEDs in the chain, providing the maximum exclusive index of LEDs in the matrix. This characteristic informs the client about the size of the LED matrix, enabling appropriate indexing.
+- **Description:** Indicates the total count of LEDs in the strip, which also represents the highest valid index for LED operations. This characteristic informs clients about the strip's size, enabling accurate indexing.
 
 ### Index Characteristic
 
 - **UUID:** 4fd3af2a-10e8-474f-84d7-722bcfd3efc3
-- **Data type:** `int16`
+- **Data type:** `uint16`
 - **Access:** Read, Write
-- **Description:** Specifies the target index for color operations performed via the Color Characteristic. The microcontroller initializes this characteristic to 0 at startup, serving as the default target index. A special value of -1 indicates that any color operation applies to all LEDs simultaneously. The value of this characteristic may be left as set by a previous client or changed as needed. Clients are encouraged to explicitly set this characteristic when targeting a specific LED or range of LEDs to ensure the intended behavior.
+- **Description:** Designates the starting index for operations performed through the Color Characteristic. The microcontroller initializes this to 0 at startup. This characteristic's value determines the starting LED for color assignments. The Index Characteristic strictly accepts non-negative values, with each representing a valid LED index within the strip.
 
 ### Color Characteristic
 
 - **UUID:** 0c903aa6-de65-44c4-9cde-8873267e16c0
 - **Data type:** `byte array`
 - **Access:** Read, Write
-- **Description:** Determines the color of the LED at the index specified by the Index Characteristic. The color data is represented as a 3-byte array in the RGB format, where the array is structured as [Red, Green, Blue]. Each byte corresponds to the intensity of the respective color component. Writing to this characteristic changes the color of the targeted LED(s). The behavior of reading this characteristic when the Index is set to -1 is undefined and should not be relied upon. Future protocol revisions may alter this behavior.
+- **Description:** Adjusts the color(s) of the LED(s) beginning from the index specified by the Index Characteristic. Data is formatted as a sequence of 3-byte RGB sets ([Red, Green, Blue]), with each byte reflecting the intensity of the respective color component. Writing to this characteristic updates the color of the targeted LED(s). Importantly, partial updates are supported, allowing for modification of individual color components without altering the entire color value. For instance, writing a single byte 0xFF when the index is set to 16 updates only the red component of that LED's color. Similarly, a sequence like 0xFF 0x00 0x00 0x00 0xFF would turn the first LED red and the next LED green, showcasing the protocol's flexibility in color adjustment. Reading from this characteristic retrieves color data for as many LEDs as possible, starting at the specified index, within the constraints of communication or buffer limits.
 
-## Notes on Behavior and Conventions
+## Behavioral Notes and Conventions
 
-- **Undefined Behavior (UB):** The protocol currently does not define the behavior of reading the Color Characteristic when the Index Characteristic is set to `-1`. Clients should avoid relying on the current implementation as it may change in future updates to ensure a more predictable and stable interface.
+- **Batch Operations:** The protocol supports batch operations for setting colors, allowing a sequence of colors to be written in a single operation, starting from the specified index. This enhancement facilitates efficient updates for multiple LEDs.
 
-- **Error Handling:** Clients should implement error checking when writing to characteristics, especially to handle cases where the index might be out of bounds or the data format for the Color Characteristic does not match expectations.
+- **Reading Color Data:** Reading from the Color Characteristic returns the color information of LEDs in batches, starting from the index specified by the Index Characteristic. This behavior aligns with the write operation, ensuring symmetry in read/write interactions.
+
+## Error Handling
+
+Clients should implement robust error checking, particularly for write operations, to manage scenarios such as out-of-bounds indices or improperly formatted data for the Color Characteristic.
 
 ## Security Considerations
 
-As of the current version of this protocol, security measures such as encryption and authentication have not been implemented or considered in detail. This means that the communication between clients and the LED Matrix Service is unsecured. Consequently, the protocol is vulnerable to eavesdropping and unauthorized access, potentially allowing malicious parties to intercept communications or control the LED matrix without permission.
-
-Users and implementers should be aware of these security limitations. Relying on this protocol for applications requiring confidentiality, integrity, or authentication is not recommended in its current state. Future revisions of the protocol will aim to address these security concerns.
+The current protocol version does not incorporate specific security mechanisms like encryption or authentication, leaving communications susceptible to eavesdropping and unauthorized access. This vulnerability underscores the importance of cautious protocol deployment, particularly in scenarios demanding confidentiality, integrity, or authentication. Future protocol updates will endeavor to enhance security features.

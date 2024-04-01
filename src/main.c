@@ -1,15 +1,17 @@
+#include <zephyr/logging/log.h>
+
 #include "led_strip_svc.h"
 
-#define PIXELS_COUNT 256
-
 #define LED_STRIP_NODE DT_ALIAS(led_strip)
+#define PIXELS_COUNT DT_PROP(LED_STRIP_NODE, chain_length)
 
-struct lss_svc_data strip_svc_data = {
-    .length = PIXELS_COUNT,
-    .device = DEVICE_DT_GET(LED_STRIP_NODE),
-};
+LOG_MODULE_REGISTER(led_strip_driver, LOG_LEVEL_DBG);
 
-BLE_LED_SVC_DEFINE(strip_svc, &strip_svc_data);
+const struct device *led_strip = DEVICE_DT_GET(LED_STRIP_NODE);
+
+static lss_svc_data_t strip_svc_data;
+
+LSS_SVC_DEFINE(strip_svc, &strip_svc_data);
 
 static const struct bt_data adv_data[] = {
     BT_DATA_BYTES(BT_DATA_FLAGS, BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR),
@@ -18,22 +20,26 @@ static const struct bt_data adv_data[] = {
 
 int main(void)
 {
-        size_t color_size = sizeof(struct led_rgb) * strip_svc_data.length;
-        strip_svc_data.color = k_malloc(color_size);
-        memset(strip_svc_data.color, 0, color_size);
+        strip_svc_data = lss_svc_data_create(PIXELS_COUNT);
 
         int err = bt_enable(NULL);
         if (err)
         {
-                printk("Bluetooth init failed (err %d)\n", err);
+                LOG_ERR("Bluetooth init failed (err %d)\n", err);
                 return err;
         }
 
         err = bt_le_adv_start(BT_LE_ADV_CONN_NAME, adv_data, ARRAY_SIZE(adv_data), NULL, 0);
         if (err)
         {
-                printk("Advertising failed to start (err %d)\n", err);
+                LOG_ERR("Advertising failed to start (err %d)\n", err);
                 return err;
+        }
+
+        while (true)
+        {
+                lss_update(led_strip, &strip_svc_data);
+                k_sleep(K_SECONDS(1));
         }
 
         return 0;

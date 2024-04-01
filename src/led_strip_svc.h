@@ -7,20 +7,6 @@
 #include <zephyr/bluetooth/uuid.h>
 #include <zephyr/drivers/led_strip.h>
 
-#ifndef BLE_LED_SVC_UPDATE_LED_THREAD_STACK_SIZE
-/**
- * @brief Size of the stack for the update LED thread.
- */
-#define BLE_LED_SVC_UPDATE_LED_THREAD_STACK_SIZE 512
-#endif
-
-#ifndef BLE_LED_SVC_UPDATE_LED_THREAD_PRIORITY
-/**
- * @brief Priority of the update LED thread.
- */
-#define BLE_LED_SVC_UPDATE_LED_THREAD_PRIORITY 10
-#endif
-
 /**
  * @brief LED service UUID value.
  */
@@ -46,7 +32,7 @@
  * @param _name Name of the service.
  * @param _data Pointer to the service data.
  */
-#define BLE_LED_SVC_DEFINE(_name, _data)                   \
+#define LSS_SVC_DEFINE(_name, _data)                       \
     BT_GATT_SERVICE_DEFINE(                                \
         _name,                                             \
         BT_GATT_PRIMARY_SERVICE(&lss_svc_uuid),            \
@@ -54,49 +40,23 @@
             (const struct bt_uuid *)&lss_length_chrc_uuid, \
             BT_GATT_CHRC_READ,                             \
             BT_GATT_PERM_READ,                             \
-            &lss_read_length_chrc, NULL, _data),           \
+            &lss_read_length_chrc,                         \
+            NULL,                                          \
+            _data),                                        \
         BT_GATT_CHARACTERISTIC(                            \
             (const struct bt_uuid *)&lss_index_chrc_uuid,  \
             BT_GATT_CHRC_READ | BT_GATT_CHRC_WRITE,        \
             BT_GATT_PERM_READ | BT_GATT_PERM_WRITE,        \
             &lss_read_index_chrc,                          \
-            &lss_write_index_chrc, _data),                 \
+            &lss_write_index_chrc,                         \
+            _data),                                        \
         BT_GATT_CHARACTERISTIC(                            \
             (const struct bt_uuid *)&lss_color_chrc_uuid,  \
             BT_GATT_CHRC_READ | BT_GATT_CHRC_WRITE,        \
             BT_GATT_PERM_READ | BT_GATT_PERM_WRITE,        \
             &lss_read_color_chrc,                          \
-            &lss_write_color_chrc, _data))
-
-/**
- * @brief LED service data.
- * @note Remember to allocate the color array equal to the length of the LED strip.
- */
-struct lss_svc_data
-{
-    /**
-     * @brief Device controlled by the service.
-     */
-    const struct device *device;
-
-    /**
-     * @brief Length of the LED strip.
-     */
-    uint16_t length;
-
-    /**
-     * @brief Index for color characteristic.
-     * @details It's stored in a way seen by the user of the service. It has to be mapped to the actual index in the LED strip on use.
-     */
-    int16_t index;
-
-    /**
-     * @brief Color of the LED strip.
-     */
-    struct led_rgb *color;
-};
-
-typedef struct lss_svc_data lss_svc_t;
+            &lss_write_color_chrc,                         \
+            _data))
 
 /**
  * @brief LED service uuid.
@@ -117,6 +77,40 @@ extern const struct bt_uuid_128 lss_index_chrc_uuid;
  * @brief Color characteristic uuid.
  */
 extern const struct bt_uuid_128 lss_color_chrc_uuid;
+/**
+ * @brief LED service data.
+ * @note Remember to allocate the color array equal to the length of the LED strip.
+ */
+struct lss_svc_data
+{
+    /**
+     * @brief Length of the LED strip.
+     */
+    uint16_t length;
+
+    /**
+     * @brief Index for color characteristic.
+     * @details It's stored in a way seen by the user of the service. It has to be mapped to the actual index in the LED strip on use.
+     */
+    int16_t index;
+
+    /**
+     * @brief Color of the LED strip.
+     */
+    uint8_t *color;
+};
+
+typedef struct lss_svc_data lss_svc_data_t;
+
+/**
+ * @brief Creates a new LED service data and allocates memory for the color data.
+ */
+lss_svc_data_t lss_svc_data_create(uint16_t length);
+
+/**
+ * @brief Frees the memory allocated for the color data.
+ */
+void lss_svc_data_free(lss_svc_data_t *data);
 
 /**
  * @brief Callback for reading the length characteristic.
@@ -169,5 +163,10 @@ ssize_t lss_write_color_chrc(
     uint16_t len,
     uint16_t offset,
     uint8_t flags);
+
+/**
+ * @brief Updates the LED strip from the service data.
+ */
+int lss_update(const struct device *dev, lss_svc_data_t *svc);
 
 #endif

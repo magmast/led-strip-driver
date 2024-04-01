@@ -3,7 +3,10 @@
 #include <math.h>
 
 #include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
 #include <zephyr/sys/byteorder.h>
+
+LOG_MODULE_DECLARE(led_strip_driver, LOG_LEVEL_DBG);
 
 const struct bt_uuid_128 lss_svc_uuid = BT_UUID_INIT_128(LSS_SVC_UUID_VAL);
 
@@ -13,24 +16,23 @@ const struct bt_uuid_128 lss_index_chrc_uuid = BT_UUID_INIT_128(LSS_INDEX_CHRC_U
 
 const struct bt_uuid_128 lss_color_chrc_uuid = BT_UUID_INIT_128(LSS_COLOR_CHRC_UUID_VAL);
 
-K_FIFO_DEFINE(update_led_queue);
-
-void update_led(void)
+lss_svc_data_t lss_svc_data_create(uint16_t length)
 {
-    while (true)
-    {
-        struct lss_svc_data *svc = k_fifo_get(&update_led_queue, K_FOREVER);
-        int err = led_strip_update_rgb(svc->device, svc->color, svc->length);
-        if (err)
-        {
-            printk("Failed to update LED strip (err %d)\n", err);
-        }
-    }
+    lss_svc_data_t data = {
+        .length = length,
+        .index = 0,
+        .color = k_malloc(sizeof(uint8_t) * length * 3),
+    };
+
+    memset(data.color, 0, sizeof(uint8_t) * length * 3);
+
+    return data;
 }
 
-K_THREAD_DEFINE(
-    update_led_thread, BLE_LED_SVC_UPDATE_LED_THREAD_STACK_SIZE, update_led,
-    NULL, NULL, NULL, 10, 0, 0);
+void lss_svc_data_free(lss_svc_data_t *data)
+{
+    k_free(data->color);
+}
 
 ssize_t lss_read_length_chrc(
     struct bt_conn *conn,
@@ -39,9 +41,11 @@ ssize_t lss_read_length_chrc(
     uint16_t len,
     uint16_t offset)
 {
+    LOG_DBG("Reading length\n");
+
     if (offset)
     {
-        printk("Invalid offset\n");
+        LOG_WRN("Invalid offset\n");
         return BT_GATT_ERR(BT_ATT_ERR_INVALID_OFFSET);
     }
 
@@ -56,9 +60,11 @@ ssize_t lss_read_index_chrc(
     uint16_t len,
     uint16_t offset)
 {
+    LOG_DBG("Reading index\n");
+
     if (offset)
     {
-        printk("Invalid offset\n");
+        LOG_WRN("Invalid offset\n");
         return BT_GATT_ERR(BT_ATT_ERR_INVALID_OFFSET);
     }
 
@@ -74,9 +80,11 @@ ssize_t lss_write_index_chrc(
     uint16_t offset,
     uint8_t flags)
 {
+    LOG_DBG("Writing index\n");
+
     if (offset)
     {
-        printk("Invalid offset\n");
+        LOG_WRN("Invalid offset\n");
         return BT_GATT_ERR(BT_ATT_ERR_INVALID_OFFSET);
     }
 
@@ -85,32 +93,19 @@ ssize_t lss_write_index_chrc(
 
     if (len != sizeof(svc->index))
     {
-        printk("Invalid attribute length\n");
+        LOG_WRN("Invalid attribute length\n");
         return BT_GATT_ERR(BT_ATT_ERR_INVALID_ATTRIBUTE_LEN);
     }
 
     if (*value < -1 || *value >= svc->length)
     {
-        printk("Invalid index\n");
+        LOG_WRN("Invalid index\n");
         return BT_GATT_ERR(BT_ATT_ERR_INVALID_PDU);
     }
 
     svc->index = *value;
 
     return len;
-}
-
-// TODO(magmast): With hardcoded 16 pixels per row, this module cannot be reused for other LED matrices.
-size_t map_index(int16_t index)
-{
-    size_t row = (size_t)floor(index / 16);
-
-    if (row % 2 == 0)
-    {
-        return row * 16 + index % 16;
-    }
-
-    return row * 16 + 15 - index % 16;
 }
 
 ssize_t lss_read_color_chrc(
@@ -120,24 +115,13 @@ ssize_t lss_read_color_chrc(
     uint16_t len,
     uint16_t offset)
 {
-    if (offset)
-    {
-        printk("Invalid offset\n");
-        return BT_GATT_ERR(BT_ATT_ERR_INVALID_OFFSET);
-    }
+    LOG_DBG("Reading color\n");
 
     struct lss_svc_data *svc = attr->user_data;
-    size_t idx = map_index(svc->index);
+    size_t byte_idx = svc->index * 3 + offset;
+    uint8_t *color = &svc->color[byte_idx];
 
-    if (idx < 0)
-    {
-        printk("Cannot read color for index %d\n", idx);
-        return BT_GATT_ERR(BT_ATT_ERR_UNLIKELY);
-    }
-
-    struct led_rgb *color = &svc->color[idx];
-
-    return bt_gatt_attr_read(conn, attr, buf, len, offset, color, sizeof(*color));
+    return bt_gatt_attr_read(conn, attr, buf, len, offset, color, MIN(510, svc->length * 3 - byte_idx));
 }
 
 ssize_t lss_write_color_chrc(
@@ -148,37 +132,31 @@ ssize_t lss_write_color_chrc(
     uint16_t offset,
     uint8_t flags)
 {
-    if (offset)
-    {
-        printk("Invalid offset\n");
-        return BT_GATT_ERR(BT_ATT_ERR_INVALID_OFFSET);
-    }
+    LOG_DBG("Writing color\n");
 
     struct lss_svc_data *svc = attr->user_data;
-    uint8_t *value = (uint8_t *)buf + offset;
-
-    if (len != 3)
-    {
-        printk("Invalid attribute length\n");
-        return BT_GATT_ERR(BT_ATT_ERR_INVALID_ATTRIBUTE_LEN);
-    }
-
-    size_t idx = map_index(svc->index);
-
-    if (idx > 0)
-    {
-        printk("Write color rgb(%d, %d, %d) for index %d\n", value[0], value[1], value[2], idx);
-        struct led_rgb *color = &svc->color[idx];
-        color->r = value[0];
-        color->g = value[1];
-        color->b = value[2];
-    }
-    else
-    {
-        memset(svc->color, 0, sizeof(*svc->color) * svc->length);
-    }
-
-    k_fifo_put(&update_led_queue, svc);
+    bytecpy(svc->color + svc->index * 3 + offset, buf, len);
 
     return len;
+}
+
+int lss_update(const struct device *dev, lss_svc_data_t *svc)
+{
+    LOG_DBG("Updating LED strip\n");
+
+    struct led_rgb *pixels = k_malloc(sizeof(struct led_rgb) * svc->length);
+    for (size_t i = 0; i < svc->length; i++)
+    {
+        struct led_rgb *pixel = &pixels[i];
+        uint8_t *byte = &svc->color[i * 3];
+        pixel->r = *byte;
+        pixel->g = *(byte + 1);
+        pixel->b = *(byte + 2);
+    }
+
+    int err = led_strip_update_rgb(dev, pixels, svc->length);
+
+    k_free(pixels);
+
+    return err;
 }
