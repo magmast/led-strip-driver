@@ -1,5 +1,5 @@
-#ifndef BLE_LED_SVC_H
-#define BLE_LED_SVC_H
+#ifndef LED_STRIP_SVC_H
+#define LED_STRIP_SVC_H
 
 #include <zephyr/device.h>
 #include <zephyr/bluetooth/bluetooth.h>
@@ -24,55 +24,55 @@
 /**
  * @brief LED service UUID value.
  */
-#define BLE_LED_SVC_UUID_VAL BT_UUID_128_ENCODE(0x4fd3af2a, 0x10e8, 0x474f, 0x84d7, 0x722bcfd3efc3)
+#define LSS_SVC_UUID_VAL BT_UUID_128_ENCODE(0x4fd3af2a, 0x10e8, 0x474f, 0x84d7, 0x722bcfd3efc3)
 
 /**
  * @brief Length characteristic UUID value.
  */
-#define BLE_LED_SVC_LENGTH_CHRC_UUID_VAL BT_UUID_128_ENCODE(0x410f7f12, 0xe051, 0x4b5d, 0xa8ed, 0x7d5619727b34)
+#define LSS_LENGTH_CHRC_UUID_VAL BT_UUID_128_ENCODE(0x410f7f12, 0xe051, 0x4b5d, 0xa8ed, 0x7d5619727b34)
 
 /**
  * @brief Index characteristic UUID value.
  */
-#define BLE_LED_SVC_INDEX_CHRC_UUID_VAL BT_UUID_128_ENCODE(0x85289f22, 0xbaa7, 0x447b, 0xacb2, 0xd961c06ecabf)
+#define LSS_INDEX_CHRC_UUID_VAL BT_UUID_128_ENCODE(0x85289f22, 0xbaa7, 0x447b, 0xacb2, 0xd961c06ecabf)
 
 /**
  * @brief Color characteristic UUID value.
  */
-#define BLE_LED_SVC_COLOR_CHRC_UUID_VAL BT_UUID_128_ENCODE(0x0c903aa6, 0xde65, 0x44c4, 0x9cde, 0x8873267e16c0)
+#define LSS_COLOR_CHRC_UUID_VAL BT_UUID_128_ENCODE(0x0c903aa6, 0xde65, 0x44c4, 0x9cde, 0x8873267e16c0)
 
 /**
  * @brief Defines a BLE LED service.
  * @param _name Name of the service.
  * @param _data Pointer to the service data.
  */
-#define BLE_LED_SVC_DEFINE(_name, _data)                           \
-    BT_GATT_SERVICE_DEFINE(                                        \
-        _name,                                                     \
-        BT_GATT_PRIMARY_SERVICE(&ble_led_svc_uuid),                \
-        BT_GATT_CHARACTERISTIC(                                    \
-            (const struct bt_uuid *)&ble_led_svc_length_chrc_uuid, \
-            BT_GATT_CHRC_READ,                                     \
-            BT_GATT_PERM_READ,                                     \
-            &ble_led_svc_read_length_chrc, NULL, _data),           \
-        BT_GATT_CHARACTERISTIC(                                    \
-            (const struct bt_uuid *)&ble_led_svc_index_chrc_uuid,  \
-            BT_GATT_CHRC_READ | BT_GATT_CHRC_WRITE,                \
-            BT_GATT_PERM_READ | BT_GATT_PERM_WRITE,                \
-            &ble_led_svc_read_index_chrc,                          \
-            &ble_led_svc_write_index_chrc, _data),                 \
-        BT_GATT_CHARACTERISTIC(                                    \
-            (const struct bt_uuid *)&ble_led_svc_color_chrc_uuid,  \
-            BT_GATT_CHRC_READ | BT_GATT_CHRC_WRITE,                \
-            BT_GATT_PERM_READ | BT_GATT_PERM_WRITE,                \
-            &ble_led_svc_read_color_chrc,                          \
-            &ble_led_svc_write_color_chrc, _data))
+#define BLE_LED_SVC_DEFINE(_name, _data)                   \
+    BT_GATT_SERVICE_DEFINE(                                \
+        _name,                                             \
+        BT_GATT_PRIMARY_SERVICE(&lss_svc_uuid),            \
+        BT_GATT_CHARACTERISTIC(                            \
+            (const struct bt_uuid *)&lss_length_chrc_uuid, \
+            BT_GATT_CHRC_READ,                             \
+            BT_GATT_PERM_READ,                             \
+            &lss_read_length_chrc, NULL, _data),           \
+        BT_GATT_CHARACTERISTIC(                            \
+            (const struct bt_uuid *)&lss_index_chrc_uuid,  \
+            BT_GATT_CHRC_READ | BT_GATT_CHRC_WRITE,        \
+            BT_GATT_PERM_READ | BT_GATT_PERM_WRITE,        \
+            &lss_read_index_chrc,                          \
+            &lss_write_index_chrc, _data),                 \
+        BT_GATT_CHARACTERISTIC(                            \
+            (const struct bt_uuid *)&lss_color_chrc_uuid,  \
+            BT_GATT_CHRC_READ | BT_GATT_CHRC_WRITE,        \
+            BT_GATT_PERM_READ | BT_GATT_PERM_WRITE,        \
+            &lss_read_color_chrc,                          \
+            &lss_write_color_chrc, _data))
 
 /**
  * @brief LED service data.
  * @note Remember to allocate the color array equal to the length of the LED strip.
  */
-struct ble_led_svc
+struct lss_svc_data
 {
     /**
      * @brief Device controlled by the service.
@@ -96,30 +96,32 @@ struct ble_led_svc
     struct led_rgb *color;
 };
 
+typedef struct lss_svc_data lss_svc_t;
+
 /**
  * @brief LED service uuid.
  */
-extern const struct bt_uuid_128 ble_led_svc_uuid;
+extern const struct bt_uuid_128 lss_svc_uuid;
 
 /**
  * @brief Length characteristic uuid.
  */
-extern const struct bt_uuid_128 ble_led_svc_length_chrc_uuid;
+extern const struct bt_uuid_128 lss_length_chrc_uuid;
 
 /**
  * @brief Index characteristic uuid.
  */
-extern const struct bt_uuid_128 ble_led_svc_index_chrc_uuid;
+extern const struct bt_uuid_128 lss_index_chrc_uuid;
 
 /**
  * @brief Color characteristic uuid.
  */
-extern const struct bt_uuid_128 ble_led_svc_color_chrc_uuid;
+extern const struct bt_uuid_128 lss_color_chrc_uuid;
 
 /**
  * @brief Callback for reading the length characteristic.
  */
-ssize_t ble_led_svc_read_length_chrc(
+ssize_t lss_read_length_chrc(
     struct bt_conn *conn,
     const struct bt_gatt_attr *attr,
     void *buf,
@@ -129,7 +131,7 @@ ssize_t ble_led_svc_read_length_chrc(
 /**
  * @brief Callback for reading the index characteristic.
  */
-ssize_t ble_led_svc_read_index_chrc(
+ssize_t lss_read_index_chrc(
     struct bt_conn *conn,
     const struct bt_gatt_attr *attr,
     void *buf,
@@ -139,7 +141,7 @@ ssize_t ble_led_svc_read_index_chrc(
 /**
  * @brief Callback for writing the index characteristic.
  */
-ssize_t ble_led_svc_write_index_chrc(
+ssize_t lss_write_index_chrc(
     struct bt_conn *conn,
     const struct bt_gatt_attr *attr,
     const void *buf,
@@ -150,7 +152,7 @@ ssize_t ble_led_svc_write_index_chrc(
 /**
  * @brief Callback for reading the color characteristic.
  */
-ssize_t ble_led_svc_read_color_chrc(
+ssize_t lss_read_color_chrc(
     struct bt_conn *conn,
     const struct bt_gatt_attr *attr,
     void *buf,
@@ -160,7 +162,7 @@ ssize_t ble_led_svc_read_color_chrc(
 /**
  * @brief Callback for writing the color characteristic.
  */
-ssize_t ble_led_svc_write_color_chrc(
+ssize_t lss_write_color_chrc(
     struct bt_conn *conn,
     const struct bt_gatt_attr *attr,
     const void *buf,
