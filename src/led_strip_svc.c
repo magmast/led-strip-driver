@@ -12,6 +12,8 @@ const struct bt_uuid_128 lss_svc_uuid = BT_UUID_INIT_128(LSS_SVC_UUID_VAL);
 
 const struct bt_uuid_128 lss_length_chrc_uuid = BT_UUID_INIT_128(LSS_LENGTH_CHRC_UUID_VAL);
 
+const struct bt_uuid_128 lss_brightness_chrc_uuid = BT_UUID_INIT_128(LSS_BRIGHTNESS_CHRC_UUID_VAL);
+
 const struct bt_uuid_128 lss_index_chrc_uuid = BT_UUID_INIT_128(LSS_INDEX_CHRC_UUID_VAL);
 
 const struct bt_uuid_128 lss_color_chrc_uuid = BT_UUID_INIT_128(LSS_COLOR_CHRC_UUID_VAL);
@@ -20,6 +22,7 @@ lss_svc_data_t lss_svc_data_create(uint16_t length)
 {
     lss_svc_data_t data = {
         .length = length,
+        .brightness = 255,
         .index = 0,
         .color = k_malloc(sizeof(uint8_t) * length * 3),
     };
@@ -51,6 +54,53 @@ ssize_t lss_read_length_chrc(
 
     struct lss_svc_data *svc = attr->user_data;
     return bt_gatt_attr_read(conn, attr, buf, len, offset, &svc->length, sizeof(svc->length));
+}
+
+ssize_t lss_read_brightness_chrc(
+    struct bt_conn *conn,
+    const struct bt_gatt_attr *attr,
+    void *buf,
+    uint16_t len,
+    uint16_t offset)
+{
+    LOG_DBG("Reading brightness\n");
+
+    if (offset)
+    {
+        LOG_WRN("Invalid offset\n");
+        return BT_GATT_ERR(BT_ATT_ERR_INVALID_OFFSET);
+    }
+
+    struct lss_svc_data *svc = attr->user_data;
+    return bt_gatt_attr_read(conn, attr, buf, len, offset, &svc->brightness, sizeof(svc->brightness));
+}
+
+ssize_t lss_write_brightness_chrc(
+    struct bt_conn *conn,
+    const struct bt_gatt_attr *attr,
+    const void *buf,
+    uint16_t len,
+    uint16_t offset,
+    uint8_t flags)
+{
+    LOG_DBG("Writing brightness\n");
+
+    if (offset)
+    {
+        LOG_WRN("Invalid offset\n");
+        return BT_GATT_ERR(BT_ATT_ERR_INVALID_OFFSET);
+    }
+
+    if (len != 1)
+    {
+        LOG_WRN("Invalid attribute length\n");
+        return BT_GATT_ERR(BT_ATT_ERR_INVALID_ATTRIBUTE_LEN);
+    }
+
+    struct lss_svc_data *svc = attr->user_data;
+    svc->brightness = *(uint8_t *)buf;
+
+    return len;
 }
 
 ssize_t lss_read_index_chrc(
@@ -149,9 +199,9 @@ int lss_update(const struct device *dev, lss_svc_data_t *svc)
     {
         struct led_rgb *pixel = &pixels[i];
         uint8_t *byte = &svc->color[i * 3];
-        pixel->r = *byte;
-        pixel->g = *(byte + 1);
-        pixel->b = *(byte + 2);
+        pixel->r = *byte * ((float)svc->brightness / 255);
+        pixel->g = *(byte + 1) * ((float)svc->brightness / 255);
+        pixel->b = *(byte + 2) * ((float)svc->brightness / 255);
     }
 
     int err = led_strip_update_rgb(dev, pixels, svc->length);

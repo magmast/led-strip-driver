@@ -18,6 +18,11 @@
 #define LSS_LENGTH_CHRC_UUID_VAL BT_UUID_128_ENCODE(0x410f7f12, 0xe051, 0x4b5d, 0xa8ed, 0x7d5619727b34)
 
 /**
+ * @brief Brightness characteristic UUID value.
+ */
+#define LSS_BRIGHTNESS_CHRC_UUID_VAL BT_UUID_128_ENCODE(0xa1e0f55c, 0x2d1b, 0x4fca, 0xae9d, 0xefb3248c202a)
+
+/**
  * @brief Index characteristic UUID value.
  */
 #define LSS_INDEX_CHRC_UUID_VAL BT_UUID_128_ENCODE(0x85289f22, 0xbaa7, 0x447b, 0xacb2, 0xd961c06ecabf)
@@ -32,30 +37,37 @@
  * @param _name Name of the service.
  * @param _data Pointer to the service data.
  */
-#define LSS_SVC_DEFINE(_name, _data)                       \
-    BT_GATT_SERVICE_DEFINE(                                \
-        _name,                                             \
-        BT_GATT_PRIMARY_SERVICE(&lss_svc_uuid),            \
-        BT_GATT_CHARACTERISTIC(                            \
-            (const struct bt_uuid *)&lss_length_chrc_uuid, \
-            BT_GATT_CHRC_READ,                             \
-            BT_GATT_PERM_READ,                             \
-            &lss_read_length_chrc,                         \
-            NULL,                                          \
-            _data),                                        \
-        BT_GATT_CHARACTERISTIC(                            \
-            (const struct bt_uuid *)&lss_index_chrc_uuid,  \
-            BT_GATT_CHRC_READ | BT_GATT_CHRC_WRITE,        \
-            BT_GATT_PERM_READ | BT_GATT_PERM_WRITE,        \
-            &lss_read_index_chrc,                          \
-            &lss_write_index_chrc,                         \
-            _data),                                        \
-        BT_GATT_CHARACTERISTIC(                            \
-            (const struct bt_uuid *)&lss_color_chrc_uuid,  \
-            BT_GATT_CHRC_READ | BT_GATT_CHRC_WRITE,        \
-            BT_GATT_PERM_READ | BT_GATT_PERM_WRITE,        \
-            &lss_read_color_chrc,                          \
-            &lss_write_color_chrc,                         \
+#define LSS_SVC_DEFINE(_name, _data)                           \
+    BT_GATT_SERVICE_DEFINE(                                    \
+        _name,                                                 \
+        BT_GATT_PRIMARY_SERVICE(&lss_svc_uuid),                \
+        BT_GATT_CHARACTERISTIC(                                \
+            (const struct bt_uuid *)&lss_length_chrc_uuid,     \
+            BT_GATT_CHRC_READ,                                 \
+            BT_GATT_PERM_READ,                                 \
+            &lss_read_length_chrc,                             \
+            NULL,                                              \
+            _data),                                            \
+        BT_GATT_CHARACTERISTIC(                                \
+            (const struct bt_uuid *)&lss_brightness_chrc_uuid, \
+            BT_GATT_CHRC_READ | BT_GATT_CHRC_WRITE,            \
+            BT_GATT_PERM_READ | BT_GATT_PERM_WRITE,            \
+            &lss_read_brightness_chrc,                         \
+            &lss_write_brightness_chrc,                        \
+            _data),                                            \
+        BT_GATT_CHARACTERISTIC(                                \
+            (const struct bt_uuid *)&lss_index_chrc_uuid,      \
+            BT_GATT_CHRC_READ | BT_GATT_CHRC_WRITE,            \
+            BT_GATT_PERM_READ | BT_GATT_PERM_WRITE,            \
+            &lss_read_index_chrc,                              \
+            &lss_write_index_chrc,                             \
+            _data),                                            \
+        BT_GATT_CHARACTERISTIC(                                \
+            (const struct bt_uuid *)&lss_color_chrc_uuid,      \
+            BT_GATT_CHRC_READ | BT_GATT_CHRC_WRITE,            \
+            BT_GATT_PERM_READ | BT_GATT_PERM_WRITE,            \
+            &lss_read_color_chrc,                              \
+            &lss_write_color_chrc,                             \
             _data))
 
 /**
@@ -67,6 +79,11 @@ extern const struct bt_uuid_128 lss_svc_uuid;
  * @brief Length characteristic uuid.
  */
 extern const struct bt_uuid_128 lss_length_chrc_uuid;
+
+/**
+ * @brief Brightness characteristic uuid.
+ */
+extern const struct bt_uuid_128 lss_brightness_chrc_uuid;
 
 /**
  * @brief Index characteristic uuid.
@@ -87,6 +104,11 @@ struct lss_svc_data
      * @brief Length of the LED strip.
      */
     uint16_t length;
+
+    /**
+     * @brief Brightness of the LED strip.
+     */
+    uint8_t brightness;
 
     /**
      * @brief Index for color characteristic.
@@ -121,6 +143,27 @@ ssize_t lss_read_length_chrc(
     void *buf,
     uint16_t len,
     uint16_t offset);
+
+/**
+ * @brief Callback for reading the brightness characteristic.
+ */
+ssize_t lss_read_brightness_chrc(
+    struct bt_conn *conn,
+    const struct bt_gatt_attr *attr,
+    void *buf,
+    uint16_t len,
+    uint16_t offset);
+
+/**
+ * @brief Callback for writing the brightness characteristic.
+ */
+ssize_t lss_write_brightness_chrc(
+    struct bt_conn *conn,
+    const struct bt_gatt_attr *attr,
+    const void *buf,
+    uint16_t len,
+    uint16_t offset,
+    uint8_t flags);
 
 /**
  * @brief Callback for reading the index characteristic.

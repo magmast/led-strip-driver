@@ -19,6 +19,13 @@ The service enables Bluetooth-based manipulation of an LED strip, allowing color
 - **Access:** Read only
 - **Description:** Indicates the total count of LEDs in the strip, which also represents the highest valid index for LED operations. This characteristic informs clients about the strip's size, enabling accurate indexing.
 
+### Brightness Characteristic
+
+- **UUID:** a1e0f55c-2d1b-4fca-ae9d-efb3248c202a
+- **Data type:** `uint8`
+- **Access:** Read, Write
+- **Description:** Adjusts the overall brightness of the LED strip by scaling all color components (Red, Green, Blue) of the Color Characteristic by the value of this characteristic. The value ranges from 0 to 255, with 0 turning the LED strip off completely and 255 representing full brightness without scaling the color values. Writing a value to this characteristic scales the color intensity of all LEDs, affecting the entire strip uniformly. This allows for dynamic brightness adjustments without needing to modify each LED's color values individually.
+
 ### Index Characteristic
 
 - **UUID:** 4fd3af2a-10e8-474f-84d7-722bcfd3efc3
