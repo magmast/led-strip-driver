@@ -3,6 +3,7 @@
 #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/settings/settings.h>
 
 #include "led_matrix.hpp"
 #include "segmented_display.hpp"
@@ -93,22 +94,31 @@ std::expected<void, int> start_advertising() {
   return {};
 }
 
-int main() {
-  int err{bt_enable(NULL)};
+void handle_bt_ready(int err) {
   if (err) {
     LOG_ERR("Bluetooth initialization failed (err %d)", err);
-    return 0;
+    return;
   }
 
   err = settings_load();
   if (err) {
     LOG_ERR("Settings loading failed (err %d)", err);
-    return 0;
+    return;
   }
 
   const auto adv_result{start_advertising()};
   if (!adv_result) {
     LOG_ERR("Advertising failed (err %d)", adv_result.error());
+    return;
+  }
+}
+
+int main() {
+  settings_subsys_init();
+
+  int err{bt_enable(handle_bt_ready)};
+  if (err) {
+    LOG_ERR("Bluetooth initialization failed (err %d)", err);
     return 0;
   }
 
@@ -116,11 +126,13 @@ int main() {
     if (!bonding) {
       update<MATRIX_WIDTH, MATRIX_HEIGHT>(matrix, service_data);
     }
+
     const auto commit_result{matrix.commit()};
     if (!commit_result) {
       LOG_ERR("Matrix commit failed (err %d)", commit_result.error());
       return 0;
     }
+
     k_sleep(K_MSEC(100));
   }
 
