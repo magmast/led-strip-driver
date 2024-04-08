@@ -6,36 +6,56 @@
 #include <zephyr/settings/settings.h>
 
 #include "led_matrix.hpp"
-#include "segmented_display.hpp"
+#include "led_segmented_display.hpp"
 #include "service.hpp"
 
 using namespace lsd;
 
 #define LED_STRIP_NODE DT_ALIAS(led_strip)
 
-constexpr std::uint16_t MATRIX_WIDTH{16};
-
-constexpr std::uint16_t MATRIX_HEIGHT{16};
-
-constexpr std::uint16_t MATRIX_SIZE{MATRIX_WIDTH * MATRIX_HEIGHT};
+constexpr Vector2 MATRIX_SIZE{16, 16};
 
 LOG_MODULE_REGISTER(lsd, LOG_LEVEL_DBG);
 
 static const device *led_strip_device = DEVICE_DT_GET(LED_STRIP_NODE);
 
-static LEDMatrix<MATRIX_WIDTH, MATRIX_HEIGHT> matrix{led_strip_device};
+static LEDMatrix<MATRIX_SIZE> matrix{led_strip_device};
 
-static ServiceData<MATRIX_WIDTH * MATRIX_HEIGHT> service_data;
+static ServiceData<MATRIX_SIZE> service_data;
 
-bool bonding{false};
+BT_GATT_SERVICE_DEFINE(
+    bt_service,
+    BT_GATT_PRIMARY_SERVICE(const_cast<bt_uuid_128 *>(&SERVICE_UUID)),
+    BT_GATT_CHARACTERISTIC(reinterpret_cast<const bt_uuid *>(&WIDTH_UUID),
+                           BT_GATT_CHRC_READ, BT_GATT_PERM_READ_AUTHEN,
+                           &read_width_cb<MATRIX_SIZE>, NULL, &service_data),
+    BT_GATT_CHARACTERISTIC(reinterpret_cast<const bt_uuid *>(&HEIGHT_UUID),
+                           BT_GATT_CHRC_READ, BT_GATT_PERM_READ_AUTHEN,
+                           &read_height_cb<MATRIX_SIZE>, NULL, &service_data),
+    BT_GATT_CHARACTERISTIC(reinterpret_cast<const bt_uuid *>(&X_UUID),
+                           BT_GATT_CHRC_READ | BT_GATT_CHRC_WRITE,
+                           BT_GATT_PERM_READ_AUTHEN | BT_GATT_PERM_WRITE_AUTHEN,
+                           &read_x_cb<MATRIX_SIZE>, &write_x_cb<MATRIX_SIZE>,
+                           &service_data),
+    BT_GATT_CHARACTERISTIC(reinterpret_cast<const bt_uuid *>(&Y_UUID),
+                           BT_GATT_CHRC_READ | BT_GATT_CHRC_WRITE,
+                           BT_GATT_PERM_READ_AUTHEN | BT_GATT_PERM_WRITE_AUTHEN,
+                           &read_y_cb<MATRIX_SIZE>, &write_y_cb<MATRIX_SIZE>,
+                           &service_data),
+    BT_GATT_CHARACTERISTIC(reinterpret_cast<const bt_uuid *>(&BRIGHTNESS_UUID),
+                           BT_GATT_CHRC_READ | BT_GATT_CHRC_WRITE,
+                           BT_GATT_PERM_READ_AUTHEN | BT_GATT_PERM_WRITE_AUTHEN,
+                           &read_brightness_cb<MATRIX_SIZE>,
+                           &write_brightness_cb<MATRIX_SIZE>, &service_data),
+    BT_GATT_CHARACTERISTIC(reinterpret_cast<const bt_uuid *>(&COLOR_UUID),
+                           BT_GATT_CHRC_READ | BT_GATT_CHRC_WRITE,
+                           BT_GATT_PERM_READ_AUTHEN | BT_GATT_PERM_WRITE_AUTHEN,
+                           &read_color_cb<MATRIX_SIZE>,
+                           &write_color_cb<MATRIX_SIZE>, &service_data));
 
-LSS_SVC_DEFINE(SERVICE, MATRIX_SIZE, &service_data);
-
-static SegmentedDisplay<MATRIX_WIDTH, MATRIX_HEIGHT> segmented_display{&matrix};
+static LEDSegmentedDisplay<MATRIX_SIZE> segmented_display{&matrix};
 
 void display_passkey(bt_conn *conn, unsigned int passkey) {
-  bonding = true;
-
   segmented_display.clear();
 
   char digits[] = "000000";
@@ -47,10 +67,7 @@ void display_passkey(bt_conn *conn, unsigned int passkey) {
   segmented_display.write(digits);
 }
 
-void cancel_auth(bt_conn *conn) {
-  bonding = false;
-  segmented_display.clear();
-}
+void cancel_auth(bt_conn *conn) { segmented_display.clear(); }
 
 void handle_security_changed(bt_conn *conn, bt_security_t level,
                              bt_security_err err) {
@@ -123,10 +140,7 @@ int main() {
   }
 
   while (true) {
-    if (!bonding) {
-      update<MATRIX_WIDTH, MATRIX_HEIGHT>(matrix, service_data);
-    }
-
+    matrix.set_pixel(15, 15, {255, 0, 0});
     const auto commit_result{matrix.commit()};
     if (!commit_result) {
       LOG_ERR("Matrix commit failed (err %d)", commit_result.error());

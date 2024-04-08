@@ -5,31 +5,22 @@
 #include <array>
 #include <expected>
 #include <string_view>
-#include <variant>
 
 #include <zephyr/drivers/led_strip.h>
 #include <zephyr/kernel.h>
 
-#include "error.hpp"
+#include "common.hpp"
+
+LOG_MODULE_DECLARE(lsd, CONFIG_LOG_DEFAULT_LEVEL);
 
 namespace lsd {
-struct Point {
-  std::size_t x;
-
-  std::size_t y;
-
-  constexpr Point() = default;
-
-  constexpr Point(const std::size_t x, const std::size_t y) : x{x}, y{y} {}
-};
-
-template <std::size_t WIDTH, std::size_t HEIGHT> class LEDMatrix {
+template <Vector2 SIZE> class LEDMatrix {
 public:
   LEDMatrix(const struct device *_device) : _device(_device) {}
 
   std::expected<const led_rgb *, InvalidIndexError>
   get_pixel(std::size_t row, std::size_t col) const {
-    if (row >= WIDTH || col >= HEIGHT) {
+    if (row >= SIZE.x || col >= SIZE.y) {
       return std::unexpected(InvalidIndexError());
     }
 
@@ -38,13 +29,13 @@ public:
   }
 
   std::expected<const led_rgb *, InvalidIndexError>
-  get_pixel(const Point &point) const {
+  get_pixel(const Vector2 &point) const {
     return get_pixel(point.x, point.y);
   }
 
   std::expected<const led_rgb *, InvalidIndexError>
   get_pixel(const std::size_t index) const {
-    if (index >= WIDTH * HEIGHT) {
+    if (index >= SIZE.x * SIZE.y) {
       return std::unexpected(InvalidIndexError());
     }
     const auto point = get_point(index);
@@ -53,9 +44,12 @@ public:
 
   std::expected<void, InvalidIndexError>
   set_pixel(std::size_t row, std::size_t col, const led_rgb &&color) {
-    if (row >= WIDTH || col >= HEIGHT) {
+    if (row >= SIZE.x || col >= SIZE.y) {
       return std::unexpected(InvalidIndexError());
     }
+
+    LOG_INF("Setting pixel at (%d, %d) to (%d, %d, %d)", row, col, color.r,
+            color.g, color.b);
 
     const auto index = get_index(row, col);
     _pixels[index] = std::move(color);
@@ -63,14 +57,14 @@ public:
     return {};
   }
 
-  std::expected<void, InvalidIndexError> set_pixel(const Point &point,
+  std::expected<void, InvalidIndexError> set_pixel(const Vector2 &point,
                                                    const led_rgb &&color) {
     return set_pixel(point.x, point.y, std::move(color));
   }
 
   std::expected<void, InvalidIndexError> set_pixel(const std::size_t index,
                                                    const led_rgb &&color) {
-    if (index >= WIDTH * HEIGHT) {
+    if (index >= SIZE.x * SIZE.y) {
       return std::unexpected(InvalidIndexError());
     }
     const auto point = get_point(index);
@@ -85,7 +79,7 @@ public:
 
   std::expected<void, int> commit() {
     const auto result =
-        led_strip_update_rgb(_device, std::data(_pixels), WIDTH * HEIGHT);
+        led_strip_update_rgb(_device, std::data(_pixels), SIZE.x * SIZE.y);
     if (result) {
       return std::unexpected(result);
     }
@@ -96,16 +90,16 @@ public:
 private:
   const device *_device;
 
-  std::array<led_rgb, WIDTH * HEIGHT> _pixels{};
+  std::array<led_rgb, SIZE.x * SIZE.y> _pixels{};
 
   std::size_t get_index(const std::size_t row, const std::size_t col) const {
-    const auto mapped_col = row % 2 == 0 ? WIDTH - col - 1 : col;
-    return row * WIDTH + mapped_col;
+    const auto mapped_col = row % 2 == 0 ? SIZE.x - col - 1 : col;
+    return row * SIZE.x + mapped_col;
   }
 
-  Point get_point(std::size_t index) {
-    const auto row = index / WIDTH;
-    const auto col = index % WIDTH;
+  Vector2 get_point(std::size_t index) {
+    const auto row = index / SIZE.x;
+    const auto col = index % SIZE.x;
     return {row, col};
   }
 };

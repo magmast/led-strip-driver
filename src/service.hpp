@@ -2,6 +2,7 @@
 
 #include <cstdint>
 
+#include <algorithm>
 #include <expected>
 #include <span>
 
@@ -18,10 +19,28 @@
   BT_UUID_128_ENCODE(0x4fd3af2a, 0x10e8, 0x474f, 0x84d7, 0x722bcfd3efc3)
 
 /**
- * @brief Length characteristic UUID value.
+ * @brief Width characteristic UUID value.
  */
-#define LSD_LENGTH_UUID_VAL                                                    \
+#define LSD_WIDTH_UUID_VAL                                                     \
   BT_UUID_128_ENCODE(0x410f7f12, 0xe051, 0x4b5d, 0xa8ed, 0x7d5619727b34)
+
+/**
+ * @brief Height characteristic UUID value.
+ */
+#define LSD_HEIGHT_UUID_VAL                                                    \
+  BT_UUID_128_ENCODE(0x730134f2, 0xe403, 0x4956, 0xa998, 0xa4649f0fa1bf)
+
+/**
+ * @brief X characteristic UUID value.
+ */
+#define LSD_X_UUID_VAL                                                         \
+  BT_UUID_128_ENCODE(0x85289f22, 0xbaa7, 0x447b, 0xacb2, 0xd961c06ecabf)
+
+/**
+ * @brief Y characteristic UUID value.
+ */
+#define LSD_Y_UUID_VAL                                                         \
+  BT_UUID_128_ENCODE(0xf1fb7f33, 0xa652, 0x4de0, 0x83f9, 0xbf3288f83f6f)
 
 /**
  * @brief Brightness characteristic UUID value.
@@ -30,200 +49,174 @@
   BT_UUID_128_ENCODE(0xa1e0f55c, 0x2d1b, 0x4fca, 0xae9d, 0xefb3248c202a)
 
 /**
- * @brief Index characteristic UUID value.
- */
-#define LSD_INDEX_UUID_VAL                                                     \
-  BT_UUID_128_ENCODE(0x85289f22, 0xbaa7, 0x447b, 0xacb2, 0xd961c06ecabf)
-
-/**
  * @brief Color characteristic UUID value.
  */
 #define LSD_COLOR_UUID_VAL                                                     \
   BT_UUID_128_ENCODE(0x0c903aa6, 0xde65, 0x44c4, 0x9cde, 0x8873267e16c0)
 
-/**
- * @brief Defines a BLE LED service.
- * @param _name Name of the service.
- */
-#define LSS_SVC_DEFINE(_name, _length, _data)                                  \
-  BT_GATT_SERVICE_DEFINE(                                                      \
-      _name,                                                                   \
-      BT_GATT_PRIMARY_SERVICE(const_cast<bt_uuid_128 *>(&lsd::SERVICE_UUID)),  \
-      BT_GATT_CHARACTERISTIC((const struct bt_uuid *)&lsd::LENGTH_UUID,        \
-                             BT_GATT_CHRC_READ, BT_GATT_PERM_READ_AUTHEN,      \
-                             &lsd::read_length_cb<_length>, NULL, _data),      \
-      BT_GATT_CHARACTERISTIC((const struct bt_uuid *)&lsd::BRIGHTNESS_UUID,    \
-                             BT_GATT_CHRC_READ | BT_GATT_CHRC_WRITE,           \
-                             BT_GATT_PERM_READ_AUTHEN |                        \
-                                 BT_GATT_PERM_WRITE_AUTHEN,                    \
-                             &lsd::read_brightness_cb<_length>,                \
-                             &lsd::write_brightness_cb<_length>, _data),       \
-      BT_GATT_CHARACTERISTIC(                                                  \
-          (const struct bt_uuid *)&lsd::INDEX_UUID,                            \
-          BT_GATT_CHRC_READ | BT_GATT_CHRC_WRITE,                              \
-          BT_GATT_PERM_READ_AUTHEN | BT_GATT_PERM_WRITE_AUTHEN,                \
-          &lsd::read_index_cb<_length>, &lsd::write_index_cb<_length>, _data), \
-      BT_GATT_CHARACTERISTIC(                                                  \
-          (const struct bt_uuid *)&lsd::COLOR_UUID,                            \
-          BT_GATT_CHRC_READ | BT_GATT_CHRC_WRITE,                              \
-          BT_GATT_PERM_READ_AUTHEN | BT_GATT_PERM_WRITE_AUTHEN,                \
-          &lsd::read_color_cb<_length>, &lsd::write_color_cb<_length>, _data))
-
 namespace lsd {
-/**
- * @brief LED service uuid.
- */
-constexpr struct bt_uuid_128 SERVICE_UUID =
-    BT_UUID_INIT_128(LSD_SERVICE_UUID_VAL);
+constexpr bt_uuid_128 SERVICE_UUID = BT_UUID_INIT_128(LSD_SERVICE_UUID_VAL);
 
-constexpr struct bt_uuid_128 LENGTH_UUID =
-    BT_UUID_INIT_128(LSD_LENGTH_UUID_VAL);
+constexpr bt_uuid_128 WIDTH_UUID = BT_UUID_INIT_128(LSD_WIDTH_UUID_VAL);
 
-constexpr struct bt_uuid_128 BRIGHTNESS_UUID =
+constexpr bt_uuid_128 HEIGHT_UUID = BT_UUID_INIT_128(LSD_HEIGHT_UUID_VAL);
+
+constexpr bt_uuid_128 X_UUID = BT_UUID_INIT_128(LSD_X_UUID_VAL);
+
+constexpr bt_uuid_128 Y_UUID = BT_UUID_INIT_128(LSD_Y_UUID_VAL);
+
+constexpr bt_uuid_128 BRIGHTNESS_UUID =
     BT_UUID_INIT_128(LSD_BRIGHTNESS_UUID_VAL);
 
-constexpr struct bt_uuid_128 INDEX_UUID = BT_UUID_INIT_128(LSD_INDEX_UUID_VAL);
-
-constexpr struct bt_uuid_128 COLOR_UUID = BT_UUID_INIT_128(LSD_COLOR_UUID_VAL);
+constexpr bt_uuid_128 COLOR_UUID = BT_UUID_INIT_128(LSD_COLOR_UUID_VAL);
 
 constexpr std::uint8_t INITIAL_BRIGHTNESS{255};
 
 constexpr std::uint16_t INITIAL_INDEX{0};
 
-using Length = std::uint16_t;
+template <Vector2 SIZE> struct ServiceData {
+  LEDMatrix<SIZE> *matrix;
 
-template <Length LENGTH> struct ServiceData {
-  Length length{LENGTH};
+  std::uint16_t width{SIZE.x};
+
+  std::uint16_t height{SIZE.y};
+
+  std::uint16_t x;
+
+  std::uint16_t y;
 
   std::uint8_t brightness{INITIAL_BRIGHTNESS};
 
-  Length index{INITIAL_INDEX};
-
-  std::array<std::uint8_t, LENGTH * 3> color{};
+  std::array<std::uint8_t, 3> color{};
 };
 
-template <Length LENGTH>
-ssize_t read_length_cb(struct bt_conn *conn, const struct bt_gatt_attr *attr,
-                       void *buf, std::uint16_t len, std::uint16_t offset) {
-  if (offset) {
-    return BT_GATT_ERR(BT_ATT_ERR_INVALID_OFFSET);
-  }
-
+template <Vector2 SIZE>
+ssize_t read_width_cb(bt_conn *conn, const bt_gatt_attr *attr, void *buf,
+                      const std::uint16_t len, const std::uint16_t offset) {
   const auto *data =
-      reinterpret_cast<const ServiceData<LENGTH> *>(attr->user_data);
-  return bt_gatt_attr_read(conn, attr, buf, len, offset, &data->length,
-                           sizeof(data->length));
+      reinterpret_cast<const ServiceData<SIZE> *>(attr->user_data);
+  return bt_gatt_attr_read(conn, attr, buf, len, offset, &data->width,
+                           sizeof(data->width));
 }
 
-template <Length LENGTH>
-ssize_t read_brightness_cb(struct bt_conn *conn,
-                           const struct bt_gatt_attr *attr, void *buf,
-                           std::uint16_t len, std::uint16_t offset) {
-  if (offset) {
-    return BT_GATT_ERR(BT_ATT_ERR_INVALID_OFFSET);
+template <Vector2 SIZE>
+ssize_t read_height_cb(bt_conn *conn, const bt_gatt_attr *attr, void *buf,
+                       const std::uint16_t len, const std::uint16_t offset) {
+  const auto *data =
+      reinterpret_cast<const ServiceData<SIZE> *>(attr->user_data);
+  return bt_gatt_attr_read(conn, attr, buf, len, offset, &data->height,
+                           sizeof(data->height));
+}
+
+template <Vector2 SIZE>
+ssize_t read_x_cb(bt_conn *conn, const bt_gatt_attr *attr, void *buf,
+                  const std::uint16_t len, const std::uint16_t offset) {
+  const auto *data =
+      reinterpret_cast<const ServiceData<SIZE> *>(attr->user_data);
+  return bt_gatt_attr_read(conn, attr, buf, len, offset, &data->x,
+                           sizeof(data->x));
+}
+
+template <Vector2 SIZE>
+ssize_t write_x_cb(bt_conn *conn, const bt_gatt_attr *attr, const void *buf,
+                   const std::uint16_t len, const std::uint16_t offset,
+                   const std::uint8_t flags) {
+  auto *data = reinterpret_cast<ServiceData<SIZE> *>(attr->user_data);
+  if (len != sizeof(data->x)) {
+    return BT_GATT_ERR(BT_ATT_ERR_INVALID_ATTRIBUTE_LEN);
   }
 
+  data->x = *reinterpret_cast<const std::uint16_t *>(buf);
+  return sizeof(data->x);
+}
+
+template <Vector2 SIZE>
+ssize_t read_y_cb(bt_conn *conn, const bt_gatt_attr *attr, void *buf,
+                  const std::uint16_t len, const std::uint16_t offset) {
   const auto *data =
-      reinterpret_cast<const ServiceData<LENGTH> *>(attr->user_data);
+      reinterpret_cast<const ServiceData<SIZE> *>(attr->user_data);
+  return bt_gatt_attr_read(conn, attr, buf, len, offset, &data->y,
+                           sizeof(data->y));
+}
+
+template <Vector2 SIZE>
+ssize_t write_y_cb(bt_conn *conn, const bt_gatt_attr *attr, const void *buf,
+                   const std::uint16_t len, const std::uint16_t offset,
+                   const std::uint8_t flags) {
+  auto *data = reinterpret_cast<ServiceData<SIZE> *>(attr->user_data);
+  if (len != sizeof(data->y)) {
+    return BT_GATT_ERR(BT_ATT_ERR_INVALID_ATTRIBUTE_LEN);
+  }
+
+  data->y = *reinterpret_cast<const std::uint16_t *>(buf);
+  return sizeof(data->y);
+}
+
+template <Vector2 SIZE>
+ssize_t read_brightness_cb(bt_conn *conn, const bt_gatt_attr *attr, void *buf,
+                           const std::uint16_t len,
+                           const std::uint16_t offset) {
+  const auto *data =
+      reinterpret_cast<const ServiceData<SIZE> *>(attr->user_data);
   return bt_gatt_attr_read(conn, attr, buf, len, offset, &data->brightness,
                            sizeof(data->brightness));
 }
 
-template <Length LENGTH>
-ssize_t write_brightness_cb(struct bt_conn *conn,
-                            const struct bt_gatt_attr *attr, const void *buf,
-                            std::uint16_t len, std::uint16_t offset,
-                            std::uint8_t flags) {
-  if (offset) {
-    return BT_GATT_ERR(BT_ATT_ERR_INVALID_OFFSET);
-  }
-
+template <Vector2 SIZE>
+ssize_t write_brightness_cb(bt_conn *conn, const bt_gatt_attr *attr,
+                            const void *buf, const std::uint16_t len,
+                            const std::uint16_t offset,
+                            const std::uint8_t flags) {
   if (len != 1) {
     return BT_GATT_ERR(BT_ATT_ERR_INVALID_ATTRIBUTE_LEN);
   }
 
-  auto *data = reinterpret_cast<ServiceData<LENGTH> *>(attr->user_data);
+  auto *data = reinterpret_cast<ServiceData<SIZE> *>(attr->user_data);
   data->brightness = *reinterpret_cast<const uint8_t *>(buf);
 
   return len;
 }
 
-template <Length LENGTH>
-ssize_t read_index_cb(struct bt_conn *conn, const struct bt_gatt_attr *attr,
-                      void *buf, std::uint16_t len, std::uint16_t offset) {
-  if (offset) {
-    return BT_GATT_ERR(BT_ATT_ERR_INVALID_OFFSET);
+template <Vector2 SIZE>
+ssize_t read_color_cb(bt_conn *conn, const bt_gatt_attr *attr, void *buf,
+                      std::uint16_t len, std::uint16_t offset) {
+  auto *data = reinterpret_cast<ServiceData<SIZE> *>(attr->user_data);
+  const auto result = data->matrix->get_pixel(data->x, data->y);
+  if (!result) {
+    return BT_GATT_ERR(BT_ATT_ERR_UNLIKELY);
   }
 
-  const auto *data =
-      reinterpret_cast<const ServiceData<LENGTH> *>(attr->user_data);
-  return bt_gatt_attr_read(conn, attr, buf, len, offset, &data->index,
-                           sizeof(data->index));
+  const auto *color = result.value();
+  data->color[0] = color->r;
+  data->color[1] = color->g;
+  data->color[2] = color->b;
+
+  return bt_gatt_attr_read(conn, attr, buf, len, offset, std::data(data->color),
+                           std::size(data->color));
 }
 
-template <Length LENGTH>
-ssize_t write_index_cb(struct bt_conn *conn, const struct bt_gatt_attr *attr,
-                       const void *buf, std::uint16_t len, std::uint16_t offset,
+template <Vector2 SIZE>
+ssize_t write_color_cb(bt_conn *conn, const bt_gatt_attr *attr, const void *buf,
+                       std::uint16_t len, std::uint16_t offset,
                        std::uint8_t flags) {
-  if (offset) {
-    return BT_GATT_ERR(BT_ATT_ERR_INVALID_OFFSET);
-  }
-
-  auto *data = reinterpret_cast<ServiceData<LENGTH> *>(attr->user_data);
-  const auto *value{reinterpret_cast<const std::int16_t *>(buf)};
-
-  if (len != sizeof(data->index)) {
+  auto *data = reinterpret_cast<ServiceData<SIZE> *>(attr->user_data);
+  if (len != std::size(data->color)) {
     return BT_GATT_ERR(BT_ATT_ERR_INVALID_ATTRIBUTE_LEN);
   }
 
-  if (*value < -1 || *value >= LENGTH) {
-    return BT_GATT_ERR(BT_ATT_ERR_INVALID_PDU);
-  }
+  const auto *color = reinterpret_cast<const std::uint8_t *>(buf);
+  std::copy_n(color, len, std::data(data->color));
 
-  data->index = *value;
+  const struct led_rgb pixel {
+    .r = data->color[0], .g = data->color[1], .b = data->color[2]
+  };
+
+  const auto result =
+      data->matrix->set_pixel(data->x, data->y, std::move(pixel));
+  if (!result) {
+    return BT_GATT_ERR(BT_ATT_ERR_UNLIKELY);
+  }
 
   return len;
 }
-
-template <Length LENGTH>
-ssize_t read_color_cb(struct bt_conn *conn, const struct bt_gatt_attr *attr,
-                      void *buf, std::uint16_t len, std::uint16_t offset) {
-  const auto *data =
-      reinterpret_cast<const ServiceData<LENGTH> *>(attr->user_data);
-
-  const auto byte_idx{data->index * 3 + offset};
-  const auto *color{&data->color[byte_idx]};
-
-  return bt_gatt_attr_read(conn, attr, buf, len, offset, color,
-                           MIN(510, LENGTH * 3 - byte_idx));
-}
-
-template <Length LENGTH>
-ssize_t write_color_cb(struct bt_conn *conn, const struct bt_gatt_attr *attr,
-                       const void *buf, std::uint16_t len, std::uint16_t offset,
-                       std::uint8_t flags) {
-  auto *data = reinterpret_cast<ServiceData<LENGTH> *>(attr->user_data);
-  bytecpy(data->color.begin() + data->index * 3 + offset, buf, len);
-
-  return len;
-}
-
-template <Length WIDTH, Length HEIGHT>
-std::expected<void, InvalidIndexError>
-update(LEDMatrix<WIDTH, HEIGHT> &matrix, ServiceData<WIDTH * HEIGHT> &data) {
-  for (std::size_t i = 0; i < WIDTH * HEIGHT; i++) {
-    const auto *byte{&data.color[i * 3]};
-    const auto brightness{static_cast<double>(data.brightness) / 255.0};
-    struct led_rgb pixel {
-      static_cast<std::uint8_t>((*byte) * brightness),
-          static_cast<std::uint8_t>((*(byte + 1)) * brightness),
-          static_cast<std::uint8_t>((*(byte + 2)) * brightness)
-    };
-    const auto result = matrix.set_pixel(i, std::move(pixel));
-    if (!result) {
-      return std::unexpected(result.error());
-    }
-  }
-  return {};
-};
 } // namespace lsd

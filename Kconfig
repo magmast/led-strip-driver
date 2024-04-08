@@ -1,0 +1,15 @@
+mainmenu "LED Matrix Configuration"
+
+source "Kconfig.zephyr"
+
+config LED_MATRIX_WIDTH
+  int "Width"
+  default 8
+  help
+    Width of the LED matrix.
+
+config LED_MATRIX_HEIGHT
+  int "Height"
+  default 8
+  help
+    Height of the LED matrix.

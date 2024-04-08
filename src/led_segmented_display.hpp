@@ -2,13 +2,13 @@
 
 #include <variant>
 
-#include "error.hpp"
+#include "common.hpp"
 #include "led_matrix.hpp"
 
 namespace lsd {
-template <std::size_t WIDTH, std::size_t HEIGHT> class SegmentedDisplay {
+template <Vector2 SIZE> class LEDSegmentedDisplay {
 public:
-  SegmentedDisplay(LEDMatrix<WIDTH, HEIGHT> *matrix) : _matrix{matrix} {}
+  LEDSegmentedDisplay(LEDMatrix<SIZE> *matrix) : _matrix{matrix} {}
 
   void set_color(const led_rgb &&color) { _color = std::move(color); }
 
@@ -40,12 +40,12 @@ public:
     }
 
     _cursor.x++;
-    if (_cursor.x * SEGMENT_WIDTH + _CHAR_WIDTH >= WIDTH) {
+    if (_cursor.x * SEGMENT_WIDTH + _CHAR_WIDTH >= SIZE.x) {
       _cursor.x = 0;
       _cursor.y++;
     }
 
-    if (_cursor.y * SEGMENT_HEIGHT + _CHAR_HEIGHT >= HEIGHT) {
+    if (_cursor.y * SEGMENT_HEIGHT + _CHAR_HEIGHT >= SIZE.y) {
       _cursor.y = 0;
     }
 
@@ -85,9 +85,9 @@ private:
       0b111100111101111, // 6
   };
 
-  LEDMatrix<WIDTH, HEIGHT> *_matrix;
+  LEDMatrix<SIZE> *_matrix;
 
-  Point _cursor;
+  Vector2 _cursor;
 
   led_rgb _color{64, 64, 64};
 };
